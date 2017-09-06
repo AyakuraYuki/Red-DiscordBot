@@ -83,7 +83,8 @@ class General:
         if user != None:
             msg = ""
             if user.id == self.bot.user.id:
-                user = ctx.message.author
+                users = list(self.bot.get_all_members())
+                user = choice(users)
                 msg = "Nice try. You think this is funny? How about *this* instead:\n\n"
             char = "abcdefghijklmnopqrstuvwxyz"
             tran = "ɐqɔpǝɟƃɥᴉɾʞlɯuodbɹsʇnʌʍxʎz"
