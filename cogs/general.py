@@ -1,16 +1,18 @@
+import asyncio
+import datetime
+import json
+import time
+from enum import Enum
+from random import choice
+from random import randint
+from urllib.parse import quote_plus
+
+import aiohttp
 import discord
 from discord.ext import commands
-from .utils.chat_formatting import escape_mass_mentions, italics, pagify
-from random import randint
-from random import choice
-from enum import Enum
-from urllib.parse import quote_plus
 from pyquery import PyQuery as pq
-import datetime
-import time
-import aiohttp
-import asyncio
-import json
+
+from .utils.chat_formatting import escape_mass_mentions, italics, pagify
 
 settings = {"POLL_DURATION": 60}
 
@@ -83,6 +85,7 @@ class General:
         if event_code is not None:
             url = "http://mlborder.com/events/{}/".format(event_code)
             document = pq(url)
+            title = document('title').text()
             body = document('body')
             border_div = pq(body('.tab-pane')[0])('div')
             data_react_props = border_div.html()
@@ -91,18 +94,37 @@ class General:
             prepare_json = original_data.replace('&quot;', '"')
             json_data = json.loads(prepare_json)
 
-            url = json_data['url']
+            event_name = title[title.index('『') + 1:title.rindex('』')]
+            event_info = document('.list-group-item').text()
+
+            ending_time = event_info[event_info.index('〜') + 1:event_info.rindex(',')]
+            ending_timestamp = time.mktime(time.strptime(ending_time, '%Y/%m/%d %H:%M'))
+            current_timestamp = time.time()
+            left_or_passed_time = ''
+            if current_timestamp < ending_timestamp:
+                left_timestamp = ending_timestamp - current_timestamp
+                left_or_passed_time += 'あと　'
+                left_or_passed_time += time.strftime('%d', time.localtime(left_timestamp))
+                left_or_passed_time += '日'
+                left_or_passed_time += time.strftime('%H:%M:%S', time.localtime(left_timestamp))
+            else:
+                pass_timestamp = current_timestamp - ending_timestamp
+                left_or_passed_time += time.strftime('%d', time.localtime(pass_timestamp))
+                left_or_passed_time += '日'
+                left_or_passed_time += time.strftime('%H:%M:%S', time.localtime(pass_timestamp))
+                left_or_passed_time += '　過ごしだ'
             border_summary = json_data['border_summary']
-            time = border_summary['time']
+            now = (datetime.datetime.fromtimestamp(current_timestamp) + datetime.timedelta(hours=1)).strftime(
+                '%Y/%m/%d %H:%M:%S')
             borders = border_summary['borders']
 
-            msg = url + "\n" + time + "\n"
-            msg += "%-6s %20dpt\n" % ("1位", borders["1"])
-            msg += "%-6s %20dpt\n" % ("10位", borders["10"])
-            msg += "%-6s %20dpt\n" % ("100位", borders["100"])
-            msg += "%-6s %20dpt\n" % ("500位", borders["500"])
-            msg += "%-6s %20dpt\n" % ("1200位", borders["1200"])
-            msg += "%-6s %20dpt" % ("1300位", borders["1300"])
+            msg = '\n'.join([f'{event_name}\n{event_info}\n{left_or_passed_time}\n\n{now}',
+                             f"1位：\t\t{borders['1']:,}",
+                             f"10位：\t\t{borders['10']:,}",
+                             f"100位：\t\t{borders['100']:,}",
+                             f"500位：\t\t{borders['500']:,}",
+                             f"1200位：\t\t{borders['1200']:,}",
+                             f"1300位：\t\t{borders['1300']:,}"])
 
             await self.bot.say(msg)
         else:
